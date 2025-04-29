@@ -61,19 +61,64 @@ def find_edges_canny(binary_img, output_prefix):
 
 # Step 2-(7): Find edges of step4 output using Sobel (Second method, kernel size 5x5)
 def find_edges_sobel(binary_img, output_prefix):
-    # Sobel edge detection in x and y directions
     sobelx = cv2.Sobel(binary_img, cv2.CV_64F, 1, 0, ksize=5)
     sobely = cv2.Sobel(binary_img, cv2.CV_64F, 0, 1, ksize=5)
-
-    # Compute the magnitude of the gradient
     sobelx = cv2.convertScaleAbs(sobelx)
     sobely = cv2.convertScaleAbs(sobely)
     sobel_combined = cv2.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
-
-    # Normalize for visualization
     sobel_combined = cv2.normalize(sobel_combined, None, 0, 255, cv2.NORM_MINMAX)
     cv2.imwrite(f'{output_prefix}_edges2_sobel.png', sobel_combined)
     return sobel_combined
+
+
+# Step 2-(8): Closing on the Sobel output using MORPH_CLOSE
+def perform_closing(sobel_img, output_prefix):
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    closed = cv2.morphologyEx(sobel_img, cv2.MORPH_CLOSE, kernel)
+    cv2.imwrite(f'{output_prefix}_edges2_closed.png', closed)
+    return closed
+
+
+# Step 2-(9): Opening on the Closing output using MORPH_OPEN
+def perform_opening(closed_img, output_prefix):
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    opened = cv2.morphologyEx(closed_img, cv2.MORPH_OPEN, kernel)
+    cv2.imwrite(f'{output_prefix}_edges2_opened.png', opened)
+    return opened
+
+
+# Step 3-(10): Hough Transform on step4 output to find lines
+def perform_hough_transform(binary_img, output_prefix):
+    # First, detect edges for Hough Transform
+    edges = cv2.Canny(binary_img, 50, 150)  # Adjusted thresholds for better edge detection
+    cv2.imwrite(f'{output_prefix}_hough_edges.png', edges)  # Save edges for debugging
+
+    # Apply Hough Transform to detect lines with a lower threshold
+    lines = cv2.HoughLines(edges, 1, np.pi / 180, 100)  # Lowered threshold from 200 to 100
+
+    # Create a blank image to draw lines
+    hough_output = np.zeros_like(binary_img)
+
+    # Draw detected lines
+    if lines is not None:
+        print(f"Number of lines detected in {output_prefix}: {len(lines)}")
+        for rho, theta in lines[:, 0]:
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            x1 = int(x0 + 1000 * (-b))
+            y1 = int(y0 + 1000 * (a))
+            x2 = int(x0 - 1000 * (-b))
+            y2 = int(y0 - 1000 * (a))
+            cv2.line(hough_output, (x1, y1), (x2, y2), 255, 2)
+    else:
+        print(f"No lines detected in {output_prefix}")
+
+    # Normalize the output for better visualization
+    hough_output = cv2.normalize(hough_output, None, 0, 255, cv2.NORM_MINMAX)
+    cv2.imwrite(f'{output_prefix}_hough.png', hough_output)
+    return hough_output
 
 
 # Process each image
@@ -101,7 +146,16 @@ def process_image(image_path, output_prefix):
     find_edges_canny(binary, output_prefix)
 
     # Perform edge detection (second method - Sobel)
-    find_edges_sobel(binary, output_prefix)
+    sobel_edges = find_edges_sobel(binary, output_prefix)
+
+    # Perform closing (second method - Closing)
+    closed = perform_closing(sobel_edges, output_prefix)
+
+    # Perform opening (second method - Opening)
+    perform_opening(closed, output_prefix)
+
+    # Perform Hough Transform
+    perform_hough_transform(binary, output_prefix)
 
 
 # Main execution

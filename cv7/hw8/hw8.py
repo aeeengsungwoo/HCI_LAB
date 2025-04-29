@@ -61,19 +61,22 @@ def find_edges_canny(binary_img, output_prefix):
 
 # Step 2-(7): Find edges of step4 output using Sobel (Second method, kernel size 5x5)
 def find_edges_sobel(binary_img, output_prefix):
-    # Sobel edge detection in x and y directions
     sobelx = cv2.Sobel(binary_img, cv2.CV_64F, 1, 0, ksize=5)
     sobely = cv2.Sobel(binary_img, cv2.CV_64F, 0, 1, ksize=5)
-
-    # Compute the magnitude of the gradient
     sobelx = cv2.convertScaleAbs(sobelx)
     sobely = cv2.convertScaleAbs(sobely)
     sobel_combined = cv2.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
-
-    # Normalize for visualization
     sobel_combined = cv2.normalize(sobel_combined, None, 0, 255, cv2.NORM_MINMAX)
     cv2.imwrite(f'{output_prefix}_edges2_sobel.png', sobel_combined)
     return sobel_combined
+
+
+# Step 2-(8): Closing on the Sobel output using MORPH_CLOSE
+def perform_closing(sobel_img, output_prefix):
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # Using a 5x5 rectangular kernel
+    closed = cv2.morphologyEx(sobel_img, cv2.MORPH_CLOSE, kernel)
+    cv2.imwrite(f'{output_prefix}_edges2_closed.png', closed)
+    return closed
 
 
 # Process each image
@@ -101,7 +104,10 @@ def process_image(image_path, output_prefix):
     find_edges_canny(binary, output_prefix)
 
     # Perform edge detection (second method - Sobel)
-    find_edges_sobel(binary, output_prefix)
+    sobel_edges = find_edges_sobel(binary, output_prefix)
+
+    # Perform closing (second method - Closing)
+    perform_closing(sobel_edges, output_prefix)
 
 
 # Main execution
